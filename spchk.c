@@ -2,31 +2,28 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <sys/stat.h>
 #include <ctype.h>
 
-#define MAX_PATH_LENGTH 1024
-#define MAX_WORD_LENGTH 50
+#define maxPathLength 1024
+#define maxWordLength 50
 
-int is_txt_file(const char *filename) {
-    size_t len = strlen(filename);
-    return len > 4 && strcmp(filename + len - 4, ".txt") == 0;
-}
 
 void check_spelling(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
-        fprintf(stderr, "Error opening file: %s\n", filename);
+        perror("Error opening file");
         return;
     }
 
-    char word[MAX_WORD_LENGTH];
+    char word[maxWordLength];
     int line_number = 1;
     while (fgets(word, sizeof(word), file) != NULL) {
         char *ptr = word;
         int col_number = 1;
         while (*ptr) {
             if (isalpha(*ptr)) {
-                char word[MAX_WORD_LENGTH];
+                char word[maxWordLength];
                 int i = 0;
                 while (isalpha(*ptr)) {
                     word[i++] = tolower(*ptr);
@@ -54,28 +51,38 @@ void check_spelling(const char *filename) {
 void traverse_directory(const char *dirname) {
     DIR *dir = opendir(dirname);
     if (dir == NULL) {
-        perror("Error opening directory");
-        exit(EXIT_FAILURE);
+        perror("failed opening directory");
+        return;
     }
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG && is_txt_file(entry->d_name)) {
-            char filepath[MAX_PATH_LENGTH];
-            snprintf(filepath, sizeof(filepath), "%s/%s", dirname, entry->d_name);
-            check_spelling(filepath);
-        } else if (entry->d_type == DT_DIR &&
-                   strcmp(entry->d_name, ".") != 0 &&
-                   strcmp(entry->d_name, "..") != 0 &&
-                   entry->d_name[0] != '.') {
-            char subdir[MAX_PATH_LENGTH];
-            snprintf(subdir, sizeof(subdir), "%s/%s", dirname, entry->d_name);
-            traverse_directory(subdir);
+        if (entry->d_name[0] == '.') 
+        continue; 
+            
+        char filePath[maxPathLength];
+        snprintf(filePath, maxPathLength, "%s/%s", dirname, entry->d_name);
+
+
+        struct stat pathStat;
+        if(stat(filePath, &pathStat) == 0){
+            if(S_ISDIR(pathStat.st_mode)){
+                traverse_directory(filePath);
+            } else if(S_ISREG(pathStat.st_mode)){
+                char *dot = strrchr(entry->d_name, '.');
+                if(strcmp(dot, ".txt") ==0 ){
+                    processFile(filePath);
+                }
+            }
+        } else{
+            perror("File status failed.");
         }
+
     }
 
     closedir(dir);
 }
+
 
 int main(int argc, char *argv[]) {
     if (argc < 3) {
@@ -90,4 +97,3 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-llll
