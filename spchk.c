@@ -9,7 +9,7 @@
 #define maxWordLength 50
 
 
-void check_spelling(const char *filename) {
+void spell_check(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         perror("Error opening file");
