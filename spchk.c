@@ -7,171 +7,147 @@
 #include <unistd.h>
 #include <ctype.h>
 
-#define maxPathLength 1024
-#define maxWordLength 50
+#define MAX_PATH_LENGTH 1024
+#define MAX_WORD_LENGTH 50
+#define BUFFER_SIZE 1024
 
-void reAddDictionary(const char *dirname) {
-    // Open the directory
+char **reAddDictionary(const char *dirname) {
     DIR *dir = opendir(dirname);
     if (dir == NULL) {
         perror("Unable to open directory");
-        return;
+        return NULL;
     }
 
-    // Dynamically allocate memory for the array of words
     int capacity = 1000;
     char **words = (char **)malloc(capacity * sizeof(char *));
     if (words == NULL) {
         perror("Memory allocation failed");
         closedir(dir);
-        return;
+        return NULL;
     }
 
-    // Initialize count of words
     int count = 0;
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Check if the entry is a regular file
-        if (entry->d_type == DT_REG) {
-            // Construct the file path
-            char filepath[maxPathLength];
-            snprintf(filepath, sizeof(filepath), "%s/%s", dirname, entry->d_name);
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
 
-            // Open the file
-            FILE *file = fopen(filepath, "r");
-            if (file == NULL) {
-                perror("Unable to open file");
-                continue;
-            }
+        char filepath[MAX_PATH_LENGTH];
+        snprintf(filepath, sizeof(filepath), "%s/%s", dirname, entry->d_name);
 
-            // Read words from the file
-            char word[maxWordLength];
-            while (fscanf(file, "%s", word) != EOF) {
-                // Check if the array needs to be resized
-                if (count >= capacity) {
-                    capacity *= 2;
-                    char **temp = (char **)realloc(words, capacity * sizeof(char *));
-                    if (temp == NULL) {
-                        perror("Memory reallocation failed");
-                        fclose(file);
-                        closedir(dir);
-                        for (int i = 0; i < count; i++) {
-                            free(words[i]);
-                        }
-                        free(words);
-                        return;
-                    }
-                    words = temp;
-                }
+        FILE *file = fopen(filepath, "r");
+        if (file == NULL) {
+            perror("Unable to open file");
+            continue;
+        }
 
-                // Allocate memory for the word and copy it
-                words[count] = (char *)malloc((strlen(word) + 1) * sizeof(char));
-                if (words[count] == NULL) {
-                    perror("Memory allocation failed");
+        char word[MAX_WORD_LENGTH];
+        while (fscanf(file, "%s", word) != EOF) {
+            if (count >= capacity) {
+                capacity *= 2;
+                char **temp = (char **)realloc(words, capacity * sizeof(char *));
+                if (temp == NULL) {
+                    perror("Memory reallocation failed");
                     fclose(file);
                     closedir(dir);
                     for (int i = 0; i < count; i++) {
                         free(words[i]);
                     }
                     free(words);
-                    return;
+                    return NULL;
                 }
-                strcpy(words[count], word);
-                count++;
+                words = temp;
             }
 
-            // Close the file
-            fclose(file);
+            words[count] = (char *)malloc((strlen(word) + 1) * sizeof(char));
+            if (words[count] == NULL) {
+                perror("Memory allocation failed");
+                fclose(file);
+                closedir(dir);
+                for (int i = 0; i < count; i++) {
+                    free(words[i]);
+                }
+                free(words);
+                return NULL;
+            }
+            strcpy(words[count], word);
+            count++;
         }
+
+        fclose(file);
     }
 
-    // Close the directory
-    closedir(dir);
-
-    // Output the words
-    printf("Words read from files in directory '%s':\n", dirname);
+    printf("Words in the dictionary:\n");
     for (int i = 0; i < count; i++) {
         printf("%s\n", words[i]);
     }
 
-    // Free memory
-    for (int i = 0; i < count; i++) {
-        free(words[i]);
-    }
-    free(words);
+    closedir(dir);
+
+    return words;
 }
 
-
-// Function to check if a word is spelled correctly
-int is_spelled_correctly(const char *word, const char **dirname) {
-    for (int i = 0; dirname[i] != NULL; i++) {
-        if (strcmp(dirname[i], word) == 0) {
+int isSpelledCorrectly(const char *word, char **words, int wordCount) {
+    for (int i = 0; i < wordCount; i++) {
+        if (strcmp(words[i], word) == 0) {
+            printf("Word found\n");
             return 1; // Word found in dictionary
         }
     }
+    printf("Word not found\n");
     return 0; // Word not found in dictionary
 }
 
-void spell_check(const char *filename) {
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1) {
-        perror("Error opening file");
-        return;
-    }
-
-    char word[maxWordLength];
-    int line_number = 1;
-    ssize_t bytes_read;
-    while ((bytes_read = read(fd, word, sizeof(word))) > 0) {
-        for (int i = 0; i < bytes_read; i++) {
-            if (!isalpha(word[i])) {
-                if (word[i] == '\n') {
-                    line_number++;
-                }
-                word[i] = '\0';
-                if (!is_spelled_correctly(word)) {
-                    printf("%s (%d,%d): %s\n", filename, line_number, i + 1, word);
-                }
-                word[0] = '\0';
-            }
-        }
-    }
-
-    if (bytes_read == -1) {
-        perror("Error reading file");
-    }
-
-    close(fd);
-}
-
-void traverse_directory(const char *dirname) {
+void spellCheckFiles(const char *dirname, char **words, int wordCount) {
     DIR *dir = opendir(dirname);
     if (dir == NULL) {
-        perror("failed opening directory");
+        perror("Failed to open directory");
         return;
     }
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_name[0] == '.')
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
 
-        char filePath[maxPathLength];
-        snprintf(filePath, maxPathLength, "%s/%s", dirname, entry->d_name);
+        char filePath[MAX_PATH_LENGTH];
+        snprintf(filePath, MAX_PATH_LENGTH, "%s/%s", dirname, entry->d_name);
 
         struct stat pathStat;
         if (stat(filePath, &pathStat) == 0) {
             if (S_ISDIR(pathStat.st_mode)) {
-                traverse_directory(filePath);
+                spellCheckFiles(filePath, words, wordCount);
             } else if (S_ISREG(pathStat.st_mode)) {
-                char *dot = strrchr(entry->d_name, '.');
-                if (dot != NULL && strcmp(dot, ".txt") == 0) {
-                    spell_check(filePath);
+                FILE *file = fopen(filePath, "r");
+                if (file == NULL) {
+                    perror("Failed to open file");
+                    continue;
                 }
+
+                char word[MAX_WORD_LENGTH];
+                int lineNumber = 1;
+                while (fscanf(file, "%s", word) != EOF) {
+                    char *ptr = word;
+                    while (*ptr) {
+                        if (!isalpha(*ptr)) {
+                            *ptr = '\0';
+                            break;
+                        }
+                        ptr++;
+                    }
+
+                    if (!isSpelledCorrectly(word, words, wordCount)) {
+                        printf("Misspelled word found: %s (File: %s, Line: %d)\n", word, entry->d_name, lineNumber);
+                    }
+
+                    lineNumber++;
+                }
+
+                fclose(file);
             }
         } else {
-            perror("File status failed.");
+            perror("Failed to get file status");
         }
     }
 
@@ -179,12 +155,31 @@ void traverse_directory(const char *dirname) {
 }
 
 int main(int argc, char *argv[]) {
+
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <directory>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    traverse_directory(argv[1]);
+    char **words = reAddDictionary(argv[1]);
+    if (words == NULL) {
+        fprintf(stderr, "Failed to load dictionary\n");
+        return EXIT_FAILURE;
+    }
+
+    // Count the number of words
+    int wordCount = 0;
+    while (words[wordCount] != NULL) {
+        wordCount++;
+    }
+
+    spellCheckFiles(argv[1], words, wordCount);
+
+    // Free allocated memory
+    for (int i = 0; i < wordCount; i++) {
+        free(words[i]);
+    }
+    free(words);
 
     return EXIT_SUCCESS;
 }
