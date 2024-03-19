@@ -36,6 +36,9 @@ char **reAddDictionary(const char *filename, int *wordCount) {
             count++;
             ptr = NULL;
             words = realloc(words, count * sizeof(char*));
+                                            
+                                            //printf("%s\n", word);
+
             if (words == NULL) {
                 perror("Error allocating memory");
                 close(file);
@@ -66,17 +69,18 @@ char **reAddDictionary(const char *filename, int *wordCount) {
     return words;
 }
 
-int binarySearch(char *dictionary[], int size, const char *word) {
+int binarySearch(char *words[], int size, const char *word) {
     int low = 0;
     int high = size - 1;
 
 
     while (low <= high) {
         int mid = low + (high - low) / 2;
-        int comparison = strcmp(dictionary[mid], word);
+        int comparison = strcmp(words[mid], word);
+
         if (comparison == 0) {
             // Word found in the dictionary
-           // printf("word found\n");
+           //printf("word found\n");
             return 1;
         } else if (comparison < 0) {
             // Word may be in the right half
@@ -88,7 +92,7 @@ int binarySearch(char *dictionary[], int size, const char *word) {
     }
 
     // Word not found in the dictionary
-    //printf("word not found");
+    printf("word not found ");
     return 0;
 }
 
@@ -121,8 +125,6 @@ void spell_check(const char *filename, char *dictionary[], int wordCount) {
                 if (word_length > 0) {
                     // Allocate memory for the word and copy it
                     word = (char *)malloc((word_length + 1) * sizeof(char));
-                                printf("%s\n", word);
-
                     if (word == NULL) {
                         perror("Memory allocation error");
                         close(file);
@@ -131,10 +133,19 @@ void spell_check(const char *filename, char *dictionary[], int wordCount) {
                     strncpy(word, &buffer[i - word_length], word_length);
                     word[word_length] = '\0'; // Null-terminate the string
                     // Print the word along with line and character number
+                    //convert word to lowercase
+                    for (int j = 0; word[j]; j++){
+                        word[j] = tolower(word[j]);
+                    }                    
+                    
+                    //printf("%s\n", word);
+
                     if (binarySearch(dictionary, wordCount, word) == 0) {
-                        printf("%s (%d, %d): %s\n", filename, line_number, char_number - word_length, word);
+                        
+                        int word_start_char = char_number - word_length;
+                        
+                        printf("%s (%d, %d): %s\n", filename, line_number, char_number - word_length + 1, word);
                     }
-                    // Free allocated memory
                     free(word);
                     word_length = 0; // Reset word length
                 }
