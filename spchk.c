@@ -92,7 +92,7 @@ int binarySearch(char *words[], int size, const char *word) {
     }
 
     // Word not found in the dictionary
-    printf("word not found ");
+    //printf("word not found ");
     return 0;
 }
 
@@ -105,7 +105,7 @@ void spell_check(const char *filename, char *dictionary[], int wordCount) {
 
     char buffer[BUFFER_SIZE];
     ssize_t bytesRead;
-    int line_number = 1;
+    int line_number = 0;
     int char_number = 1;
     char *word = NULL;
     int word_length = 0;
