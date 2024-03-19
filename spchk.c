@@ -16,9 +16,12 @@ char **reAddDictionary(const char *filename, int *wordCount) {
         perror("Unable to open file");
         return NULL;
     }
-
+    char buffer[BUFFER_SIZE];
+    ssize_t bytesRead;
     int capacity = 1000;
     int count = 0;
+
+
     char **words = (char **)malloc(capacity * sizeof(char *));
     if (words == NULL) {
         perror("Memory allocation failed");
@@ -26,39 +29,27 @@ char **reAddDictionary(const char *filename, int *wordCount) {
         return NULL;
     }
 
-    char word[maxWordLength];
-    ssize_t bytesRead;
-    while ((bytesRead = read(file, word, maxWordLength - 1)) > 0) {
-        // Null-terminate the word
-        word[bytesRead] = '\0';
-        
-        if (count >= capacity) {
-            capacity *= 2;
-            char **temp = realloc(words, capacity * sizeof(char *));
-            if (temp == NULL) {
-                perror("Memory reallocation failed");
+    while ((bytesRead = read(file, buffer, BUFFER_SIZE)) > 0) {
+        char *ptr = buffer;
+        char *word;
+        while ((word = strtok(ptr, " \t\n")) != NULL) { // Split buffer into words
+            count++;
+            ptr = NULL;
+            words = realloc(words, count * sizeof(char*));
+            if (words == NULL) {
+                perror("Error allocating memory");
                 close(file);
-                for (int i = 0; i < count; i++) {
-                    free(words[i]);
-                }
-                free(words);
-                return NULL;
+                return NULL; // Return NULL if memory allocation fails
             }
-            words = temp;
-        }
-
-        words[count] = strdup(word);
-        if (words[count] == NULL) {
-            perror("Memory allocation failed");
-            close(file);
-            for (int i = 0; i < count; i++) {
-                free(words[i]);
+            words[count - 1] = strdup(word); // Store the word in the array
+            if (words[count - 1] == NULL) {
+                perror("Error duplicating string");
+                close(file);
+                return NULL; // Return NULL if string duplication fails
             }
-            free(words);
-            return NULL;
         }
-        count++;
     }
+    
 
     if (bytesRead == -1) {
         perror("Error reading from file");
@@ -79,12 +70,13 @@ int binarySearch(char *dictionary[], int size, const char *word) {
     int low = 0;
     int high = size - 1;
 
+
     while (low <= high) {
         int mid = low + (high - low) / 2;
         int comparison = strcmp(dictionary[mid], word);
         if (comparison == 0) {
             // Word found in the dictionary
-            printf("word found");
+           // printf("word found\n");
             return 1;
         } else if (comparison < 0) {
             // Word may be in the right half
@@ -96,57 +88,60 @@ int binarySearch(char *dictionary[], int size, const char *word) {
     }
 
     // Word not found in the dictionary
-    printf("word not found");
+    //printf("word not found");
     return 0;
 }
 
 void spell_check(const char *filename, char *dictionary[], int wordCount) {
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1) {
+    int file = open(filename, O_RDONLY);
+    if (file == -1) {
         perror("Error opening file");
         return;
     }
 
     char buffer[BUFFER_SIZE];
     ssize_t bytesRead;
-    int lineNumber = 1;
-    int charNumber = 1;
+    int line_number = 1;
+    int char_number = 1;
     char *word = NULL;
-    int wordLength = 0;
+    int word_length = 0;
 
     // Read characters from the file
-    while ((bytesRead = read(fd, buffer, BUFFER_SIZE)) > 0) {
+    while ((bytesRead = read(file, buffer, BUFFER_SIZE)) > 0) {
+        
         for (ssize_t i = 0; i < bytesRead; i++) {
             char ch = buffer[i];
             // Check for newline character
             if (ch == '\n') {
                 // Increment line number and reset character number
-                lineNumber++;
-                charNumber = 1;
-            } else if (isspace(ch)) {
+                line_number++;
+                char_number = 1;
+            } if (ch == ' ' || ch == '\t' || ch == '\r' || ch=='\n') {
                 // Word boundary found, store the word if it's not empty
-                if (wordLength > 0) {
+                if (word_length > 0) {
                     // Allocate memory for the word and copy it
-                    word = (char *)malloc((wordLength + 1) * sizeof(char));
+                    word = (char *)malloc((word_length + 1) * sizeof(char));
+                                printf("%s\n", word);
+
                     if (word == NULL) {
                         perror("Memory allocation error");
-                        close(fd);
+                        close(file);
                         return;
                     }
-                    strncpy(word, &buffer[i - wordLength], wordLength);
-                    word[wordLength] = '\0'; // Null-terminate the string
+                    strncpy(word, &buffer[i - word_length], word_length);
+                    word[word_length] = '\0'; // Null-terminate the string
                     // Print the word along with line and character number
-                    if (binarySearch(dictionary, wordCount, word) == 1) {
-                        printf("%s (%d, %d): %s\n", filename, lineNumber, charNumber - wordLength, word);
+                    if (binarySearch(dictionary, wordCount, word) == 0) {
+                        printf("%s (%d, %d): %s\n", filename, line_number, char_number - word_length, word);
                     }
                     // Free allocated memory
                     free(word);
-                    wordLength = 0; // Reset word length
+                    word_length = 0; // Reset word length
                 }
             } else {
                 // Non-space character, increment character number
-                charNumber++;
-                wordLength++; // Increment word length
+                char_number++;
+                word_length++; // Increment word length
             }
         }
     }
@@ -156,7 +151,7 @@ void spell_check(const char *filename, char *dictionary[], int wordCount) {
     }
 
     // Close the file
-    close(fd);
+    close(file);
 }
 
 int main(int argc, char *argv[]) {
@@ -170,16 +165,17 @@ int main(int argc, char *argv[]) {
 
     int wordCount;
     char **words = reAddDictionary(filename, &wordCount);
-    for (int i = 0; i < wordCount; i++) {
-        printf(words[i]);
-        printf(testfile);
+
+
+    for (int i = 0; i < wordCount - 1; i++) {
+       //printf("%s\n", words[i]);
     }
     if (words == NULL) {
         fprintf(stderr, "Failed to create dictionary\n");
         return EXIT_FAILURE;
     }
 
-    spell_check(testfile, words, wordCount);
+    spell_check(testfile, words, wordCount - 1);
 
     // Free allocated memory
     for (int i = 0; i < wordCount; i++) {
