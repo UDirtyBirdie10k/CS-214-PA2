@@ -70,12 +70,12 @@ char **reAddDictionary(const char *filename, int *wordCount) {
 }
 
 int binarySearch(char *words[], int size, const char *word) {
-    int low = 0;
-    int high = size - 1;
+    int left = 0;
+    int right = size - 1;
 
 
-    while (low <= high) {
-        int mid = low + (high - low) / 2;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
         int comparison = strcmp(words[mid], word);
 
         if (comparison == 0) {
@@ -84,10 +84,10 @@ int binarySearch(char *words[], int size, const char *word) {
             return 1;
         } else if (comparison < 0) {
             // Word may be in the right half
-            low = mid + 1;
+            left = mid + 1;
         } else {
             // Word may be in the left half
-            high = mid - 1;
+            right = mid - 1;
         }
     }
 
